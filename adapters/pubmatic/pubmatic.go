@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -288,8 +289,9 @@ func (a *PubmaticAdapter) Call(ctx context.Context, req *pbs.PBSRequest, bidder 
 				DealId:      bid.DealID,
 			}
 
-			mediaType := getMediaTypeForImp(bid.ImpID, pbReq.Imp)
-			pbid.CreativeMediaType = string(mediaType)
+			// mediaType := getMediaTypeForImp(bid.ImpID, pbReq.Imp)
+			// pbid.CreativeMediaType = string(mediaType)
+			pbid.CreativeMediaType = getBidType(bid.Adm)
 
 			bids = append(bids, &pbid)
 			logf("[PUBMATIC] Returned Bid for PubID [%s] AdUnit [%s] BidID [%s] Size [%dx%d] Price [%f] \n",
@@ -507,7 +509,8 @@ func (a *PubmaticAdapter) MakeBids(internalRequest *openrtb.BidRequest, external
 			bid := sb.Bid[i]
 			bidResponse.Bids = append(bidResponse.Bids, &adapters.TypedBid{
 				Bid:     &bid,
-				BidType: getMediaTypeForImp(bid.ImpID, internalRequest.Imp),
+				// BidType: getMediaTypeForImp(bid.ImpID, internalRequest.Imp),
+				BidType: pbid.CreativeMediaType = getBidType(bid.Adm),
 			})
 
 		}
@@ -515,23 +518,35 @@ func (a *PubmaticAdapter) MakeBids(internalRequest *openrtb.BidRequest, external
 	return bidResponse, errs
 }
 
-// getMediaTypeForImp figures out which media type this bid is for.
-func getMediaTypeForImp(impId string, imps []openrtb.Imp) openrtb_ext.BidType {
-	mediaType := openrtb_ext.BidTypeBanner
-	for _, imp := range imps {
-		if imp.ID == impId {
-			if imp.Video != nil {
-				mediaType = openrtb_ext.BidTypeVideo
-			} else if imp.Audio != nil {
-				mediaType = openrtb_ext.BidTypeAudio
-			} else if imp.Native != nil {
-				mediaType = openrtb_ext.BidTypeNative
-			}
-			return mediaType
-		}
+// getBidType figures out which media type this bid is for. default value is banner
+func getBidType(adm string) openrtb_ext.BidType {
+	// we have not considered Native case for now as we are not supporting native.
+	//native: we can check if given adm can be converted to json; Native check will be first check then
+	// video: if adm has "VAST version" string mentioned
+	if match, _ := regexp.MatchString("VAST\\s+version", adm); match == true {
+		return openrtb_ext.BidTypeVideo	
 	}
-	return mediaType
+	// banner: default value
+	return openrtb_ext.BidTypeBanner 
 }
+
+// getMediaTypeForImp figures out which media type this bid is for.
+// func getMediaTypeForImp(impId string, imps []openrtb.Imp) openrtb_ext.BidType {
+// 	mediaType := openrtb_ext.BidTypeBanner
+// 	for _, imp := range imps {
+// 		if imp.ID == impId {
+// 			if imp.Video != nil {
+// 				mediaType = openrtb_ext.BidTypeVideo
+// 			} else if imp.Audio != nil {
+// 				mediaType = openrtb_ext.BidTypeAudio
+// 			} else if imp.Native != nil {
+// 				mediaType = openrtb_ext.BidTypeNative
+// 			}
+// 			return mediaType
+// 		}
+// 	}
+// 	return mediaType
+// }
 
 func logf(msg string, args ...interface{}) {
 	if glog.V(2) {
