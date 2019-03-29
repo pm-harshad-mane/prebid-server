@@ -510,7 +510,7 @@ func (a *PubmaticAdapter) MakeBids(internalRequest *openrtb.BidRequest, external
 			bidResponse.Bids = append(bidResponse.Bids, &adapters.TypedBid{
 				Bid:     &bid,
 				// BidType: getMediaTypeForImp(bid.ImpID, internalRequest.Imp),
-				BidType: pbid.CreativeMediaType = getBidType(bid.Adm),
+				BidType: getBidType(bid.Adm),
 			})
 
 		}
