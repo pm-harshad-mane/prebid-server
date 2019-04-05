@@ -48,6 +48,10 @@ type pubmaticParams struct {
 	Keywords    map[string]string `json:"keywords,omitempty"`
 }
 
+type bidExtension struct{
+	BidType int `json:"bidtype"`
+}
+
 const (
 	INVALID_PARAMS    = "Invalid BidParam"
 	MISSING_PUBID     = "Missing PubID"
@@ -58,6 +62,10 @@ const (
 	INVALID_HEIGHT    = "Invalid Height"
 	INVALID_MEDIATYPE = "Invalid MediaType"
 	INVALID_ADSLOT    = "Invalid AdSlot"
+	BID_TYPE_BANNER		= iota
+	BID_TYPE_VIDEO
+	BID_TYPE_NATIVE
+	BID_TYPE_AUDIO
 )
 
 func PrepareLogMessage(tID, pubId, adUnitId, bidID, details string, args ...interface{}) string {
@@ -291,8 +299,9 @@ func (a *PubmaticAdapter) Call(ctx context.Context, req *pbs.PBSRequest, bidder 
 
 			// mediaType := getMediaTypeForImp(bid.ImpID, pbReq.Imp)
 			// pbid.CreativeMediaType = string(mediaType)
-			pbid.CreativeMediaType = getBidType(bid.Adm)
-
+			// pbid.CreativeMediaType = getBidType(bid.Adm)
+			bidType, _ := getBidType(&bid)
+			pbid.CreativeMediaType = bidType
 			bids = append(bids, &pbid)
 			logf("[PUBMATIC] Returned Bid for PubID [%s] AdUnit [%s] BidID [%s] Size [%dx%d] Price [%f] \n",
 				pubId, pbid.AdUnitCode, pbid.BidID, pbid.Width, pbid.Height, pbid.Price)
@@ -507,28 +516,49 @@ func (a *PubmaticAdapter) MakeBids(internalRequest *openrtb.BidRequest, external
 	for _, sb := range bidResp.SeatBid {
 		for i := 0; i < len(sb.Bid); i++ {
 			bid := sb.Bid[i]
+			bidType, _ := getBidType(&bid)
 			bidResponse.Bids = append(bidResponse.Bids, &adapters.TypedBid{
 				Bid:     &bid,
 				// BidType: getMediaTypeForImp(bid.ImpID, internalRequest.Imp),
-				BidType: getBidType(bid.Adm),
+				// BidType: getBidType(bid.Adm),
+				BidType: bidType,
 			})
-
 		}
 	}
 	return bidResponse, errs
 }
 
 // getBidType figures out which media type this bid is for. default value is banner
-func getBidType(adm string) openrtb_ext.BidType {
-	// we have not considered Native case for now as we are not supporting native.
-	//native: we can check if given adm can be converted to json; Native check will be first check then
-	// video: if adm has "VAST version" string mentioned
-	if match, _ := regexp.MatchString("VAST\\s+version", adm); match == true {
-		return openrtb_ext.BidTypeVideo	
+func getBidType(bid *openrtb.Bid) (openrtb_ext.BidType, error) {
+	var bidExt bidExtension
+	if err := json.Unmarshal(bid.Ext, &bidExt); err != nil {
+		return "", err
 	}
-	// banner: default value
-	return openrtb_ext.BidTypeBanner 
+	switch bidExt.BidType {
+		case BID_TYPE_BANNER:
+			return openrtb_ext.BidTypeBanner, nil
+		case BID_TYPE_VIDEO:
+			return openrtb_ext.BidTypeVideo, nil
+		case BID_TYPE_AUDIO:
+			return openrtb_ext.BidTypeAudio, nil
+		case BID_TYPE_NATIVE:
+			return openrtb_ext.BidTypeNative, nil
+		default:
+			return "", fmt.Errorf("Unrecognized bidtype in response from PubMatic: %d", bidExt.BidType)
+	}	
 }
+
+// getBidType figures out which media type this bid is for. default value is banner
+// func getBidType(adm string) openrtb_ext.BidType {
+// 	// we have not considered Native case for now as we are not supporting native.
+// 	//native: we can check if given adm can be converted to json; Native check will be first check then
+// 	// video: if adm has "VAST version" string mentioned
+// 	if match, _ := regexp.MatchString("VAST\\s+version", adm); match == true {
+// 		return openrtb_ext.BidTypeVideo	
+// 	}
+// 	// banner: default value
+// 	return openrtb_ext.BidTypeBanner 
+// }
 
 // getMediaTypeForImp figures out which media type this bid is for.
 // func getMediaTypeForImp(impId string, imps []openrtb.Imp) openrtb_ext.BidType {
