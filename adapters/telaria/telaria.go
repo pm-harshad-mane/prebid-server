@@ -89,7 +89,8 @@ func (adapter *TelariaAdapter) MakeRequests (request *openrtb.BidRequest, reqInf
 	return adapterRequests, errs
 }
 
-func (adapter *TelariaAdapter) buildCommonHttpHeaders(request *openrtb.BidRequest) {
+func (adapter *TelariaAdapter) buildCommonHttpHeaders(request *openrtb.BidRequest) {	
+	adapter.httpHeaders = &http.Header{} // always reset
 	// todo: add the headers to const
 	adapter.httpHeaders.Add("Accept", "*/*")
 	adapter.httpHeaders.Add("Connection", "keep-alive")
