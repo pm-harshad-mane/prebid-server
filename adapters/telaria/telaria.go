@@ -4,6 +4,7 @@ import(
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/mxmCherry/openrtb"
@@ -17,6 +18,7 @@ const (
 	ERR_URI_CONF = "Incorrect Telaria request URI %s, please check the configuration."
 	ERR_NO_IMPS = "Telaria:No impressions found in the bid request"
 	ERR_NO_VALID_IMPS = "Telaria:No valid impression in the bid request"
+	ERR_PARAM_EMPTY = "%s param is empty"
 	ERR_NO_VID_MEDIA_TYPE = "Telaria: only supports video media type. Ignoring imp id=%s"
 	ERR_EXT_NOT_FOUND = "Telaria: ext.bidder not found"
 	ERR_EXT_BIDDER_PARSE_FAIL = "Telaria: Failed to parse ext.bidder.publisher"
@@ -31,7 +33,7 @@ type TelariaAdapter struct {
 	httpHeaders *http.Header // using common headers per request as headers will not change per request
 }
 
-func NewTelariaBidder(client *http.Client, endpointURL string) *TelariaAdapter {	
+func NewTelariaBidder(client *http.Client, endpointURL string) *TelariaAdapter {
 	if _, err := url.Parse(endpointURL), err != nil {
 		panic(fmt.Sprintf(ERR_URI_CONF, endpointURL))
 	}
@@ -89,7 +91,7 @@ func (adapter *TelariaAdapter) MakeRequests (request *openrtb.BidRequest, reqInf
 	return adapterRequests, errs
 }
 
-func (adapter *TelariaAdapter) buildCommonHttpHeaders(request *openrtb.BidRequest) {	
+func (adapter *TelariaAdapter) buildCommonHttpHeaders(request *openrtb.BidRequest) {
 	adapter.httpHeaders = &http.Header{} // always reset
 	// todo: add the headers to const
 	adapter.httpHeaders.Add("Accept", "*/*")
@@ -149,6 +151,12 @@ func (adapter *TelariaAdapter) buildSingleRequestData(request *openrtb.BidReques
 }
 
 func checkParams(telariaExt openrtb_ext.ExtImpTelaria) error {
+	if telariaExt.AdCode == "" {
+		return &errortypes.BadInput{
+			Message: fmt.Sprintf(ERR_PARAM_EMPTY, "AdCode"),
+		}
+	}
+
 	return nil
 }
 
